@@ -22,13 +22,22 @@ const handleCreateUrl = async (req, res) => {
     res.status(201).json(url);
   } catch (error) {
     console.error("URL creation failed:", error.message);
+
+    if (error.code === 11000) {
+      return res.status(409).json({ error: "Short URL already exists" });
+    }
+
     res.status(400).json({ error: error.message });
   }
 };
 
 const handleFindUrl = async (req, res) => {
   try {
-    const url = await Url.findOne({ shortUrl: req.params.shortUrl });
+    const url = await Url.findOneAndUpdate(
+      { shortUrl: req.params.shortUrl },
+      { $inc: { clickCount: 1 } },
+      { new: true },
+    );
 
     if (!url) {
       return res.status(404).json({ error: "Short URL not found" });
@@ -41,4 +50,25 @@ const handleFindUrl = async (req, res) => {
   }
 };
 
-export { handleCreateUrl, handleFindUrl };
+const handleUrlAnalytics = async (req, res) => {
+  try {
+    const url = await Url.findOne({ shortUrl: req.params.shortUrl }).select(
+      "shortUrl originalUrl clickCount",
+    );
+
+    if (!url) {
+      return res.status(404).json({ error: "Short URL not found" });
+    }
+
+    return res.json({
+      shortUrl: url.shortUrl,
+      originalUrl: url.originalUrl,
+      clickCount: url.clickCount ?? 0,
+    });
+  } catch (error) {
+    console.error("URL analytics lookup failed:", error.message);
+    return res.status(500).json({ error: "Unable to find URL analytics" });
+  }
+};
+
+export { handleCreateUrl, handleFindUrl, handleUrlAnalytics };
